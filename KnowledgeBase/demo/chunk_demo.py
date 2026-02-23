@@ -1,7 +1,7 @@
 from tqdm import tqdm
 from dotenv import load_dotenv
 import os
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import ChatOpenAI
 import pdfplumber
 import fitz  # PyMuPDF
@@ -16,7 +16,7 @@ from langchain_core.embeddings import Embeddings
 
 
 # 加载 .env 文件中的环境变量
-load_dotenv("../env")
+load_dotenv()
 # 获取名为'VAR'的环境变量
 API_KEY = os.environ.get("API_KEY")
 BASE_URL = os.environ.get("BASE_URL")
