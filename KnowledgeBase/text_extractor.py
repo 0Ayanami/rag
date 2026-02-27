@@ -1,12 +1,8 @@
 from tqdm import tqdm
-import os
 import argparse
 from pathlib import Path
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import re
 import pdfplumber
-
-# 文本切分器
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
 
 class ProcessPDF:
     def __init__(self, pdf_path: str):
@@ -15,14 +11,66 @@ class ProcessPDF:
         self.texts = self.extract_text()
 
     def extract_text(self):
-        """提取全部文本内容（含基础排版信息）"""
+        """提取文本内容并进行基本清洗"""
+        def normalize_text(text: str) -> str:
+            if not text:
+                return ""
+            # 清理中文字符间异常空格
+            text = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", text)
+            text = re.sub(r"\s+", " ", text).strip()
+            return text
+
+        def split_lines_from_words(words, y_tol: float = 2.0):
+            lines = []
+            current = []
+            current_top = None
+            for w in sorted(words, key=lambda x: (x["top"], x["x0"])):
+                if current_top is None or abs(w["top"] - current_top) <= y_tol:
+                    current.append(w)
+                    current_top = w["top"] if current_top is None else current_top
+                else:
+                    lines.append(current)
+                    current = [w]
+                    current_top = w["top"]
+            if current:
+                lines.append(current)
+            return lines
+
+        def numbered_heading_level(line_text: str) -> int:
+            # 匹配类似 "1. ", "1.2 ", "1.2.3 " 的编号标题，返回层级数（最多3级）
+            m = re.match(r"^\s*(\d+(?:\.\d+){0,2})(?:[\.、）\)]|\s)+\S+", line_text)
+            if not m:
+                return 0
+            return min(max(len(m.group(1).split(".")), 1), 3)
+
         full_text = []
         with pdfplumber.open(self.pdf_path) as pdf:
-            for page in pdf.pages:
-                # 提取当前页文本（保留Y坐标顺序）
-                text = page.extract_text(x_tolerance=1, y_tolerance=3)
-                full_text.append(f"=== Page {page.page_number} ===")
-                full_text.append(text)
+            # 去掉最后一页（通常是免责声明）
+            pages = pdf.pages[:-1] if len(pdf.pages) > 1 else pdf.pages
+
+            for page in pages:
+                full_text.append(f"<!-- Page {page.page_number} -->")
+                words = page.extract_words(
+                    x_tolerance=1,
+                    y_tolerance=3,
+                    keep_blank_chars=False,
+                    extra_attrs=["size", "fontname", "top", "x0"],
+                ) or []
+                lines = split_lines_from_words(words, y_tol=2.0)
+
+                for line_words in lines:
+                    line_words = sorted(line_words, key=lambda x: x["x0"])
+                    line_text = normalize_text(" ".join(w["text"] for w in line_words))
+                    if not line_text:
+                        continue
+
+                    level_by_num = numbered_heading_level(line_text)
+
+                    if level_by_num > 0:
+                        full_text.append(f"{'#' * level_by_num} {line_text}")
+                    else:
+                        full_text.append(line_text)
+                full_text.append("")
         return "\n".join(full_text)
 
 
@@ -73,8 +121,8 @@ def build_parser():
     )
     parser.add_argument(
         "--output",
-        default="./extracted_md",
-        help="输出目录（默认: ./extracted_md）",
+        default="../data/extracted_md",
+        help="输出目录（默认: ../data/extracted_md）",
     )
     parser.add_argument(
         "--encoding",
