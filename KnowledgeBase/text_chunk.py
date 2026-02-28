@@ -2,7 +2,6 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Sequence
-
 from langchain_core.documents import Document
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_ollama import OllamaEmbeddings
@@ -15,8 +14,8 @@ class ChunkConfig:
     chunk_size: int = 500
     chunk_overlap: int = 50
     break_threshold: float = 0.3
-    ollama_model: str = "qwen3-embedding"
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen3-embedding:0.6b "
+    ollama_base_url: str = "http://localhost:11434/v1"
 
 
 def collect_text_files(input_path: str, suffixes: Sequence[str] = (".md", ".txt")) -> List[Path]:
@@ -49,7 +48,7 @@ def load_documents(input_path: str, suffixes: Sequence[str] = (".md", ".txt")) -
     ]
 
 
-def _char_splitter(chunk_size: int, chunk_overlap: int) -> RecursiveCharacterTextSplitter:
+def splitter(chunk_size: int, chunk_overlap: int) -> RecursiveCharacterTextSplitter:
     return RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -58,7 +57,7 @@ def _char_splitter(chunk_size: int, chunk_overlap: int) -> RecursiveCharacterTex
 
 
 def chunk_fixed(documents: Iterable[Document], chunk_size: int, chunk_overlap: int) -> List[Document]:
-    return _char_splitter(chunk_size, chunk_overlap).split_documents(list(documents))
+    return splitter(chunk_size, chunk_overlap).split_documents(list(documents))
 
 
 def chunk_markdown_header_recursive(
@@ -68,7 +67,7 @@ def chunk_markdown_header_recursive(
         headers_to_split_on=[("#", "h1"), ("##", "h2"), ("###", "h3"), ("####", "h4")],
         strip_headers=False,
     )
-    splitter = _char_splitter(chunk_size, chunk_overlap)
+    splitter = splitter(chunk_size, chunk_overlap)
     chunks: List[Document] = []
 
     for doc in documents:
@@ -130,8 +129,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--chunk_size", type=int, default=500, help="固定/标题递归分块大小")
     parser.add_argument("--chunk_overlap", type=int, default=50, help="固定/标题递归分块重叠长度")
     parser.add_argument("--break_threshold", type=float, default=0.3, help="语义分块断点阈值")
-    parser.add_argument("--ollama_model", type=str, default="qwen3-embedding", help="本地 Ollama Embedding 模型名")
-    parser.add_argument("--ollama_base_url", type=str, default="http://localhost:11434", help="Ollama 服务地址")
+    parser.add_argument("--ollama_model", type=str, default="qwen3-embedding:0.6b ", help="本地 Ollama Embedding 模型名")
+    parser.add_argument("--ollama_base_url", type=str, default="http://localhost:11434/v1", help="Ollama 服务地址")
     return parser
 
 

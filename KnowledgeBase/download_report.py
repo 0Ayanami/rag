@@ -168,7 +168,7 @@ def fetch_and_save_report(url):
     return True
 
 def main():
-    print("开始用 Selenium 获取详情页链接（可能需要下载 ChromeDriver）...")
+    print("开始用 Selenium 获取详情页链接...")
     links = get_report_links_with_selenium(ORG_PAGE)
     print(f"共抓取到 {len(links)} 个可能的详情页链接（去重/过滤后）")
     # 过滤同站内有效的详情页（只保留 data.eastmoney.com 下有 infocode 或 zw_stock）
