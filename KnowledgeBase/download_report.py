@@ -14,7 +14,7 @@ import json
 import argparse
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -116,29 +116,6 @@ def download_pdf_from_report(report_page_url: str, outdir: str, session: request
         print(f"[OK] 下载完成: {path}")
     return path
 
-
-def find_org_table(soup: BeautifulSoup) -> Optional[Any]:
-    """
-    尝试定位 orgpublish_table
-    """
-    # 精确路径优先
-    selectors = [
-        "html body div.main div.main-content div.framecontent div#orgpublish_table table.table-model",
-        "body div.main div.main-content div.framecontent div#orgpublish_table table.table-model",
-        "div.main div.main-content div.framecontent div#orgpublish_table table.table-model",
-        "#orgpublish_table table.table-model",
-        "#orgpublish_table table",
-        "#org_publishtable table.table-model",  # 页面里偶见旧命名
-        "#org_publishtable table",
-        "table.table-model",
-    ]
-    for selector in selectors:
-        table = soup.select_one(selector)
-        if table:
-            return table
-    return soup.find("table")
-
-
 def parse_rows_from_initdata(html: str, base_url: str) -> List[Dict[str, str]]:
     """
     页面无静态 table 时，从 `var initdata = {...};` 解析首屏数据。
@@ -154,7 +131,6 @@ def parse_rows_from_initdata(html: str, base_url: str) -> List[Dict[str, str]]:
 
     data = payload.get("data") or []
     rows: List[Dict[str, str]] = []
-    type_map = {2: "策略报告", 3: "行业研究", 4: "券商晨会"}
 
     for i, item in enumerate(data, 1):
         info_code = str(item.get("infoCode") or "").strip()
@@ -170,137 +146,21 @@ def parse_rows_from_initdata(html: str, base_url: str) -> List[Dict[str, str]]:
 
         publish_date = str(item.get("publishDate") or "")
         if publish_date:
+            # 提取出具体的日期部分，去掉时间等多余信息
             publish_date = publish_date.split(" ")[0]
-
-        report_type_value = item.get("reportType")
-        report_type = str(item.get("columnType") or "").strip()
-        if not report_type:
-            report_type = type_map.get(report_type_value, str(report_type_value or ""))
-
-        target = item.get("stockName") or item.get("industryName") or ""
 
         rows.append(
             {
                 "index": str(i),
                 "title": str(item.get("title") or ""),
-                "type": str(report_type),
-                "target": str(target),
+                "type": str(item.get("columnType") or "").strip(),
+                "target": str(item.get("stockName") or item.get("industryName") or ""),
                 "author": str(author),
-                "org": str(item.get("orgName") or ""),
+                "org": str(item.get("orgSName") or ""),
                 "date": publish_date,
                 "report_url": report_url,
             }
         )
-
-    return rows
-
-def parse_table_rows(table, base_url: str) -> List[Dict[str, str]]:
-    """
-    解析表格，返回每行的字典：
-    {
-      "index": ..., 
-      "title": ...,         # 报告名称（从该列提取文本）
-      "type": ...,          # 报告类型
-      "target": ...,        # 研究对象
-      "author": ...,        # 作者
-      "org": ...,           # 机构
-      "date": ...,          # 日期
-      "report_url": ...     # 报告详情页（绝对 URL，尽可能提取）
-    }
-    base_url 用于把相对 href 变成绝对 URL。
-    """
-    # 先尝试读取表头（thead 优先）
-    headers = []
-    header_row = None
-    thead = table.find("thead")
-    if thead:
-        header_row = thead.find("tr")
-    if not header_row:
-        first_tr = table.find("tr")
-        header_row = first_tr
-
-    if header_row:
-        for th in header_row.find_all("th"):
-            headers.append(th.get_text(strip=True).lower())
-
-    print(f"[DEBUG] 表头列数: {len(headers)}，内容: {headers}")
-
-    # 定义按关键字匹配列索引的 helper
-    def col_idx_by_keywords(keywords):
-        for kw in keywords:
-            for i, h in enumerate(headers):
-                if kw in h:
-                    return i
-        return None
-
-    # 根据你提供的顺序优先映射
-    idx_col = col_idx_by_keywords(["序号", "id", "no"])
-    title_col = col_idx_by_keywords(["报告名称", "标题", "name"])
-    type_col = col_idx_by_keywords(["报告类型", "类型", "report type"]) 
-    target_col = col_idx_by_keywords(["研究对象", "对象", "company"])
-    author_col = col_idx_by_keywords(["作者", "撰写", "author"])
-    org_col = col_idx_by_keywords(["机构", "发布机构", "机构名称"])
-    date_col = col_idx_by_keywords(["日期", "发布时间", "发布日期", "time", "date"])
-
-    rows = []
-    tbody = table.find("tbody") or table
-
-    # 如果 header_row 是 table 中的第一行并且没有 thead，需要在解析数据时跳过它
-    skip_first = (table.find("thead") is None) and header_row is not None
-
-    for i, tr in enumerate(tbody.find_all("tr")):
-        if skip_first and i == 0:
-            # 跳过 header 行
-            continue
-
-        tds = tr.find_all(["td", "th"])
-        if not tds:
-            continue
-
-        def cell_text(col):
-            if col is None:
-                return ""
-            if col < len(tds):
-                return tds[col].get_text(strip=True)
-            return ""
-
-        # 报告链接：优先从 title_col 的 <a> 中提取
-        report_url = ""
-        title_text = ""
-        if title_col is not None and title_col < len(tds):
-            title_cell = tds[title_col]
-            a = title_cell.find("a", href=True)
-            if a:
-                href = a["href"].strip()
-                report_url = urljoin(base_url, href)
-                title_text = a.get_text(strip=True)
-            else:
-                # 没有 a 的话取整列文本
-                title_text = title_cell.get_text(strip=True)
-
-        # 如果没有在 title_col 找到链接，退回到整行搜索第一个 a[href]
-        if not report_url:
-            a_row = tr.find("a", href=True)
-            if a_row:
-                report_url = urljoin(base_url, a_row["href"].strip())
-                if not title_text:
-                    title_text = a_row.get_text(strip=True)
-
-        # fallback: 若 title_text 仍然为空，使用列文本或空串
-        if not title_text and title_col is not None:
-            title_text = cell_text(title_col)
-
-        row = {
-            "index": cell_text(idx_col),
-            "title": title_text,
-            "type": cell_text(type_col),
-            "target": cell_text(target_col),
-            "author": cell_text(author_col),
-            "org": cell_text(org_col),
-            "date": cell_text(date_col),
-            "report_url": report_url
-        }
-        rows.append(row)
 
     return rows
 
@@ -341,9 +201,9 @@ def parse_date(datestr: str) -> Optional[datetime]:
 
 
 def match_filters(row: Dict[str, str], filters: Dict[str, Any]) -> bool:
+    # 筛选出需要下载的报告
     if filters.get("indexes"):
         try:
-            # row["index"] may include non-digits; extract digits
             digits = re.search(r"(\d+)", row.get("index", ""))
             if not digits:
                 return False
@@ -386,6 +246,7 @@ def match_filters(row: Dict[str, str], filters: Dict[str, Any]) -> bool:
 
 
 def parse_indexes_arg(arg: Optional[str]) -> Optional[set]:
+    # 解析 indexes 参数，支持范围如 1-10,20,30-40
     if not arg:
         return None
     s = set()
@@ -418,27 +279,20 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
     except Exception as e:
         raise RuntimeError(f"请求机构页面失败: {org_url} -> {e}")
 
-    base_url = "https://data.eastmoney.com"
-    soup = BeautifulSoup(resp.text, "lxml")
-    table = find_org_table(soup)
-    rows: List[Dict[str, str]] = []
-    if table:
-        rows = parse_table_rows(table, base_url)
-        if verbose:
-            print(f"[INFO] 通过 HTML table 解析到 {len(rows)} 行")
+    # 读取表格
+    parsed_url = urlsplit(org_url)
+    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
-    # 页面常见 JS 渲染：无 table 时改从 initdata 提取
-    if not rows:
-        rows = parse_rows_from_initdata(resp.text, base_url)
-        if verbose:
-            print(f"[INFO] 通过 initdata 解析到 {len(rows)} 行")
-
+    rows = parse_rows_from_initdata(resp.text, base_url)
+    if verbose:
+        print(f"[INFO] 通过 initdata 解析到 {len(rows)} 行")
+    
     if not rows:
         raise RuntimeError("未找到可解析的数据（table 与 initdata 均为空），请检查页面结构或网络返回内容。")
-
     if verbose:
         print(f"[INFO] 总解析行数: {len(rows)}")
 
+    # 解析筛选参数
     filters = {}
     idx_set = parse_indexes_arg(indexes_arg)
     if idx_set:
@@ -452,17 +306,9 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
     if date_to_arg:
         filters["date_to"] = parse_date(date_to_arg)
 
-    # prepare tasks
     tasks = []
     base = org_url
     for r in rows:
-        # some report_url may be javascript or empty; skip those without href
-        href = r.get("report_url", "")
-        if not href:
-            continue
-        # normalize to absolute
-        abs_href = urljoin(base, href)
-        r["report_url"] = abs_href
         if match_filters(r, filters):
             tasks.append(r)
 
@@ -476,7 +322,6 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
             print(f" - index={t.get('index')} date={t.get('date')} type={t.get('type')} target={t.get('target')} url={t.get('report_url')}")
         return
 
-    # download with thread pool
     results = []
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
         future_to_row = {}
@@ -493,7 +338,6 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
                 print(f"[ERROR] 下载任务异常: {r.get('report_url')} -> {e}")
                 results.append((r, None))
 
-    # summary
     ok = sum(1 for _, p in results if p)
     fail = len(results) - ok
     print(f"[DONE] 成功 {ok}，失败 {fail}，保存目录: {os.path.abspath(outdir)}")
@@ -508,10 +352,10 @@ def main_cli():
     parser.add_argument("org_url", help="机构发布列表页 URL，例如: https://data.eastmoney.com/report/orgpublish.jshtml?orgcode=80000031")
     parser.add_argument("--outdir", "-o", default="./eastmoney_reports", help="保存目录")
     parser.add_argument("--indexes", default="1-20", help="按序号筛选，例如: 1,2,5-10")
-    parser.add_argument("--types", help="按报告类型筛选，逗号分隔，支持部分匹配（中文）")
-    parser.add_argument("--targets", help="按研究对象/公司筛选，逗号分隔，支持部分匹配（中文）")
-    parser.add_argument("--date-from", help="开始日期（含），格式例子: 2026-01-01 或 2026/01/01 或 2026年01月01日")
-    parser.add_argument("--date-to", help="结束日期（含）")
+    parser.add_argument("--types", help="按报告类型筛选，逗号分隔")
+    parser.add_argument("--targets", help="按研究对象/公司筛选，逗号分隔")
+    parser.add_argument("--date-from", help="开始日期（含），格式例子: 2026-01-01")
+    parser.add_argument("--date-to", help="结束日期（含")
     parser.add_argument("--concurrency", "-c", type=int, default=4, help="并发下载数")
     parser.add_argument("--dry-run", action="store_true", help="只列出将下载的报告，不实际下载")
     parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
