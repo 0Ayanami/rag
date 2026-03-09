@@ -34,40 +34,20 @@ def safe_filename(name: str) -> str:
     name = re.sub(r"\s+", " ", name).strip()
     return name[:200] if len(name) > 200 else name
 
-
-def extract_title(soup: BeautifulSoup) -> str:
-    h1 = soup.find("h1")
-    if h1 and h1.get_text(strip=True):
-        return h1.get_text(strip=True)
-
-    if soup.title and soup.title.get_text(strip=True):
-        title = soup.title.get_text(strip=True)
-        title = re.sub(r"[\-_]\s*东方财富网.*$", "", title).strip()
-        return title or "eastmoney_report"
-
-    return "eastmoney_report"
-
-
 def extract_pdf_url(page_url: str, html: str) -> Optional[str]:
     """
-    从报告页面 HTML 中尝试多种策略找到 PDF 链接，返回绝对 URL 或 None
+    从报告页面 HTML 中找到 PDF 链接，返回绝对 URL 或 None
     """
     soup = BeautifulSoup(html, "lxml")
-
-    # 常见直接 <a href="...pdf">
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
-        if re.search(r"\.pdf($|\?)", href, flags=re.I):
-            return urljoin(page_url, href)
-
-    # 特定类名或选择器（如 a.pdf-link）
     link = soup.select_one("a.pdf-link[href]")
     if link:
-        return urljoin(page_url, link["href"].strip())
+        href = (link.get("href") or "").strip()
+        if href:
+            return urljoin(page_url, href)
     return None
 
 
-def download_pdf_from_report(report_page_url: str, outdir: str, session: requests.Session, verbose: bool = False) -> Optional[str]:
+def download_pdf_from_report(report_page_url: str, outdir: str, title: str, session: requests.Session, verbose: bool = False) -> Optional[str]:
     """
     访问报告详情页，寻找 PDF 并下载。返回保存路径或 None。
     """
@@ -85,21 +65,29 @@ def download_pdf_from_report(report_page_url: str, outdir: str, session: request
             print(f"[WARN] 未在报告页找到 PDF 链接: {report_page_url}")
         return None
 
+    pdf_headers = dict(HEADERS)
+    pdf_headers["Referer"] = report_page_url
     try:
-        pdf_resp = session.get(pdf_url, headers=HEADERS, timeout=DEFAULT_TIMEOUT * 2)
+        pdf_resp = session.get(pdf_url, headers=pdf_headers, timeout=DEFAULT_TIMEOUT * 2)
         pdf_resp.raise_for_status()
     except Exception as e:
         if verbose:
             print(f"[ERROR] 下载 PDF 失败: {pdf_url} -> {e}")
         return None
 
-    try:
-        soup = BeautifulSoup(resp.text, "lxml")
-        title = safe_filename(extract_title(soup))
-    except Exception:
-        title = safe_filename(os.path.basename(urlparse(pdf_url).path) or "report")
+    # 防止被反爬返回空内容/HTML，误保存为 .pdf
+    if (not pdf_resp.content) or (len(pdf_resp.content) < 5) or (not pdf_resp.content.startswith(b"%PDF")):
+        if verbose:
+            ct = pdf_resp.headers.get("Content-Type")
+            print(f"[WARN] 非有效 PDF 内容: url={pdf_url} content_type={ct} bytes={len(pdf_resp.content)}")
+        return None
 
-    filename = f"{title}.pdf"
+    try:
+        s_title = safe_filename(title)
+    except Exception:
+        s_title = safe_filename(os.path.basename(urlparse(pdf_url).path) or "report")
+
+    filename = f"{s_title}.pdf"
     os.makedirs(outdir, exist_ok=True)
     path = os.path.join(outdir, filename)
 
@@ -326,7 +314,7 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
         future_to_row = {}
         for r in tasks:
-            future = ex.submit(download_pdf_from_report, r["report_url"], outdir, session, verbose)
+            future = ex.submit(download_pdf_from_report, r["report_url"], outdir, r["title"], session, verbose)
             future_to_row[future] = r
 
         for fut in as_completed(future_to_row):
@@ -351,7 +339,7 @@ def main_cli():
     parser = argparse.ArgumentParser(description="从东方财富机构发布页批量下载 PDF（支持筛选）")
     parser.add_argument("org_url", help="机构发布列表页 URL，例如: https://data.eastmoney.com/report/orgpublish.jshtml?orgcode=80000031")
     parser.add_argument("--outdir", "-o", default="./eastmoney_reports", help="保存目录")
-    parser.add_argument("--indexes", default="1-20", help="按序号筛选，例如: 1,2,5-10")
+    parser.add_argument("--indexes", default="1-10", help="按序号筛选，例如: 1,2,5-10")
     parser.add_argument("--types", help="按报告类型筛选，逗号分隔")
     parser.add_argument("--targets", help="按研究对象/公司筛选，逗号分隔")
     parser.add_argument("--date-from", help="开始日期（含），格式例子: 2026-01-01")
