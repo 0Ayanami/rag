@@ -28,7 +28,6 @@ HEADERS = {
 }
 DEFAULT_TIMEOUT = 20
 
-
 def safe_filename(name: str) -> str:
     name = re.sub(r"[\\/:*?\"<>|]+", "_", name)
     name = re.sub(r"\s+", " ", name).strip()
@@ -75,7 +74,6 @@ def download_pdf_from_report(report_page_url: str, outdir: str, title: str, sess
             print(f"[ERROR] 下载 PDF 失败: {pdf_url} -> {e}")
         return None
 
-    # 防止被反爬返回空内容/HTML，误保存为 .pdf
     if (not pdf_resp.content) or (len(pdf_resp.content) < 5) or (not pdf_resp.content.startswith(b"%PDF")):
         if verbose:
             ct = pdf_resp.headers.get("Content-Type")
@@ -149,7 +147,6 @@ def parse_rows_from_initdata(html: str, base_url: str) -> List[Dict[str, str]]:
                 "report_url": report_url,
             }
         )
-
     return rows
 
 def parse_date(datestr: str) -> Optional[datetime]:
@@ -295,7 +292,6 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
         filters["date_to"] = parse_date(date_to_arg)
 
     tasks = []
-    base = org_url
     for r in rows:
         if match_filters(r, filters):
             tasks.append(r)
@@ -338,8 +334,8 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
 def main_cli():
     parser = argparse.ArgumentParser(description="从东方财富机构发布页批量下载 PDF（支持筛选）")
     parser.add_argument("org_url", help="机构发布列表页 URL，例如: https://data.eastmoney.com/report/orgpublish.jshtml?orgcode=80000031")
-    parser.add_argument("--outdir", "-o", default="./eastmoney_reports", help="保存目录")
-    parser.add_argument("--indexes", default="1-10", help="按序号筛选，例如: 1,2,5-10")
+    parser.add_argument("--outdir", "-o", default="./data/eastmoney_reports", help="保存目录")
+    parser.add_argument("--indexes", default="1-20", help="按序号筛选，例如: 1,2,5-10")
     parser.add_argument("--types", help="按报告类型筛选，逗号分隔")
     parser.add_argument("--targets", help="按研究对象/公司筛选，逗号分隔")
     parser.add_argument("--date-from", help="开始日期（含），格式例子: 2026-01-01")
@@ -361,7 +357,6 @@ def main_cli():
         dry_run=args.dry_run,
         verbose=args.verbose
     )
-
 
 if __name__ == "__main__":
     main_cli()

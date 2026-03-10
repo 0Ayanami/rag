@@ -116,13 +116,13 @@ def build_parser():
     parser = argparse.ArgumentParser(description="提取 PDF 文本并导出为 Markdown 文件")
     parser.add_argument(
         "--input",
-        required=True,
-        help="输入路径：可为单个 PDF 文件，或包含 PDF 的目录",
+        default="data/eastmoney_reports",
+        help="输入路径：可为单个 PDF 文件，或包含 PDF 的目录（默认: data/eastmoney_reports）",
     )
     parser.add_argument(
         "--output",
-        default="../data/extracted_md",
-        help="输出目录（默认: ../data/extracted_md）",
+        default="data/extracted_md",
+        help="输出目录（默认: data/extracted_md）",
     )
     parser.add_argument(
         "--encoding",
