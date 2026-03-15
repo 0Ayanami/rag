@@ -1,4 +1,5 @@
 /.vscode
-/data
 /projects
 /KnowledgeBase/.env
+/KnowledgeBase/data
+/KnowledgeBase/__pycache__
