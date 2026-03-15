@@ -334,7 +334,7 @@ def run_batch(org_url: str, outdir: str, indexes_arg: Optional[str], types_arg: 
 def main_cli():
     parser = argparse.ArgumentParser(description="从东方财富机构发布页批量下载 PDF（支持筛选）")
     parser.add_argument("org_url", help="机构发布列表页 URL，例如: https://data.eastmoney.com/report/orgpublish.jshtml?orgcode=80000031")
-    parser.add_argument("--outdir", "-o", default="./data/eastmoney_reports", help="保存目录")
+    parser.add_argument("--outdir", "-o", default="data/eastmoney_reports", help="保存目录")
     parser.add_argument("--indexes", default="1-20", help="按序号筛选，例如: 1,2,5-10")
     parser.add_argument("--types", help="按报告类型筛选，逗号分隔")
     parser.add_argument("--targets", help="按研究对象/公司筛选，逗号分隔")

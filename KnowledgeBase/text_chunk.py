@@ -14,7 +14,7 @@ class ChunkConfig:
     chunk_size: int = 500
     chunk_overlap: int = 50
     break_threshold: float = 0.3
-    ollama_model: str = "qwen3-embedding:0.6b "
+    ollama_model: str = "qwen3-embedding:0.6b"
     ollama_base_url: str = "http://localhost:11434/v1"
 
 

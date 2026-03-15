@@ -17,6 +17,15 @@ class ProcessPDF:
                 return ""
             # 清理中文字符间异常空格
             text = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", text)
+            # 清理字母之间被拆开的空格
+            text = re.sub(r"(?<=[a-zA-Z])\s+(?=[a-zA-Z])", "", text)
+            # 清理数字与数字/单位符号之间的空格
+            # 支持 . , % + - / 等符号
+            text = re.sub(r"(?<=[0-9])\s+(?=[0-9.,%+\-/])", "", text)
+            text = re.sub(r"(?<=[0-9.,%+\-/()])\s+(?=[0-9])", "", text)
+            # 清理数字与字母之间空格
+            text = re.sub(r"(?<=\d)\s+(?=[a-zA-Z])", "", text)
+            # 最后统一普通空格
             text = re.sub(r"\s+", " ", text).strip()
             return text
 
