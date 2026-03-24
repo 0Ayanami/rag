@@ -3,3 +3,4 @@
 /KnowledgeBase/.env
 /KnowledgeBase/data
 /KnowledgeBase/__pycache__
+/KnowledgeBase/chroma_db
