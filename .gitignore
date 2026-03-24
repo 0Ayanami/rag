@@ -4,3 +4,4 @@
 /KnowledgeBase/data
 /KnowledgeBase/__pycache__
 /KnowledgeBase/chroma_db
+/KnowledgeBase/chat_history
