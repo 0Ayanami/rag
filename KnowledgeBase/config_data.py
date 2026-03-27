@@ -20,3 +20,10 @@ embed_model_name = "qwen3-embedding:0.6b"
 
 # chat模型配置
 chat_model_name = "qwen3:4b"
+
+# session_id配置
+session_config = {
+        "configurable":{
+            "session_id": "user_001",
+        }
+    }
