@@ -1,4 +1,4 @@
-from vector_stores import VectorStoreService
+from KnowledgeBase.rag.vector_stores import VectorStoreService
 import config_data as config
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder

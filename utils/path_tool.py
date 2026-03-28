@@ -9,7 +9,7 @@ def get_project_root():
     """
     current_file = os.path.abspath(__file__)
     current_dir = os.path.dirname(current_file)# util
-    return os.path.dirname(current_dir)# KnowledgeBase
+    return os.path.dirname(current_dir)# RAG
 
 def get_abs_path(relative_path: str):
     """

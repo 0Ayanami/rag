@@ -1,8 +1,8 @@
 /.vscode
 /projects
-/KnowledgeBase/.env
-/KnowledgeBase/data
-/KnowledgeBase/__pycache__
-/KnowledgeBase/chroma_db
-/KnowledgeBase/chat_history
-/KnowledgeBase/demo
+/.env
+/data
+/__pycache__
+/chroma_db
+/chat_history
+/demo
