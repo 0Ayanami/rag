@@ -1,5 +1,5 @@
 import os, hashlib
-from logger_handler import logger
+from .logger_handler import logger
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
@@ -26,7 +26,7 @@ def get_file_md5_hex(file_path):
 
 def listdir_with_allowed_type(path:str, allowed_types:tuple[str]):
     files = []
-    if not os.isdir(path):
+    if not os.path.isdir(path):
         logger.error(f"[listdir_with_allowed_type]路径不是目录: {path}")
         return allowed_types
     

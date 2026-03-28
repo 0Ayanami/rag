@@ -1,5 +1,5 @@
 import logging
-from path_tool import get_abs_path
+from .path_tool import get_abs_path
 import os
 from datetime import datetime
 

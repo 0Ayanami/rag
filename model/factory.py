@@ -16,13 +16,11 @@ class BaseModelFactory(ABC):
         pass
 
 class ChatModelFactory(BaseModelFactory):
-    @abstractmethod
     def generator(self)-> Optional[Embeddings | BaseChatModel]:
         return ChatOllama(model=rag_conf["chat_model_name"])
     # return ChatTongyi(model=rag_conf["chat_model_name"])
     
 class EmbeddingsFactory(BaseModelFactory):
-    @abstractmethod
     def generator(self)-> Optional[Embeddings | BaseChatModel]:
         return OllamaEmbeddings(model=rag_conf["embedding_model_name"])
     # return DashScopeEmbeddings(model=rag_conf["embedding_model_name"])

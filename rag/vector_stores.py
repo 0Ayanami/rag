@@ -35,7 +35,7 @@ class VectorStoreService(object):
         """
         def check_md5_hex(md5_str: str):
             # 检查传入的md5字符串是否已经被处理过了
-            md5_path = get_abs_path(chroma_conf["md5_path"])
+            md5_path = get_abs_path(chroma_conf["md5_hex_store"])
             if not os.path.exists(md5_path):
                 open(md5_path, "w", encoding="utf-8").close()
                 return False
@@ -50,7 +50,7 @@ class VectorStoreService(object):
             
         def save_md5(md5_str: str):
         # 将传入的md5字符串记录到文件内保存
-            with open(get_abs_path(chroma_conf["md5_path"]), "a", encoding="utf-8") as f:
+            with open(get_abs_path(chroma_conf["md5_hex_store"]), "a", encoding="utf-8") as f:
                 f.write(md5_str + "\n")
         
         def get_file_document(read_path: str):
@@ -63,7 +63,7 @@ class VectorStoreService(object):
                 return []
             
         allowed_files_path:list[str] = listdir_with_allowed_type(get_abs_path(chroma_conf["data_path"]),
-                                                                  tuple(chroma_conf["allowed_types"]))
+                                                                  tuple(chroma_conf["allow_knowledge_file_type"]))
         for file in allowed_files_path:
             md5_hex = get_file_md5_hex(file)
             if check_md5_hex(md5_hex):
