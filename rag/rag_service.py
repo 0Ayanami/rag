@@ -1,4 +1,4 @@
-from vector_stores import VectorStoreService
+from .vector_stores import VectorStoreService
 from model.factory import chat_model
 from utils.prompt_loader import load_rag_prompt
 from langchain_core.prompts import PromptTemplate

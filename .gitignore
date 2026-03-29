@@ -2,7 +2,14 @@
 /projects
 /.env
 /data
-/__pycache__
 /chroma_db
 /chat_history
 /demo
+/log
+
+/__pycache__
+/model/__pycache__
+/utils/__pycache__
+/rag/__pycache__
+/agent/__pycache__
+/agent/tools/__pycache__
